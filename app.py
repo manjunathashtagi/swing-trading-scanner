@@ -11,6 +11,7 @@ import time
 import sys
 import re
 from tqdm import tqdm          # pip install tqdm
+import os
 
 # --------- Configuration ----------
 NSE_CSV_URL = "https://nsearchives.nseindia.com/content/indices/ind_nifty500list.csv"
@@ -20,6 +21,37 @@ HIST_DAYS = 180              # historical window for indicators
 YF_PERIOD = "6mo"            # fallback period (live)
 REQUEST_TIMEOUT = 20
 SLEEP_BETWEEN = 0.12         # polite delay between ticker downloads
+
+
+def get_mode():
+    """
+    Get mode from environment variable MODE if available,
+    otherwise ask user interactively.
+    """
+    mode_in = os.getenv("MODE")
+    if mode_in:
+        print(f"MODE detected from environment: {mode_in}")
+        return mode_in.strip()
+    else:
+        return input("Select mode (1 = Live, 2 = Backdated): ").strip()
+
+def main():
+    print("Welcome to the Automated Swing Trading Scanner! 📈")
+    
+    mode_in = get_mode()   # <-- updated line
+
+    if mode_in == "1":
+        print("Running in Live mode...")
+        # your existing live mode code here
+    elif mode_in == "2":
+        print("Running in Backdated mode...")
+        # your existing backdated mode code here
+    else:
+        print("Invalid mode selected. Exiting...")
+        return
+
+    # continue with rest of your script...
+
 
 # --------- Utilities ----------
 def download_nifty500_list(retries=3, timeout=REQUEST_TIMEOUT):

@@ -28,7 +28,9 @@ jobs:
       - name: Run Swing Trade Scanner
         run: |
           python app.py
-
+        env:
+            MODE: "1"   # 1 = Live, 2 = Backdated
+            
       # Debug step: show all generated files
       - name: List files for debugging
         run: ls -R
@@ -39,6 +41,8 @@ jobs:
         with:
           name: csv-results
           path: "**/*.csv"
+          
+
 
       # Telegram notification
       - name: Send Telegram Notification
