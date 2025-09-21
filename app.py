@@ -9,18 +9,18 @@ from tqdm import tqdm
 from io import StringIO
 import time
 
+# --------- Configuration ----------
 NSE_CSV_URL = "https://nsearchives.nseindia.com/content/indices/ind_nifty500list.csv"
 OUTPUT_FILE = "swing_trading_results.csv"
 
-# --------- Configuration ----------
 DAILY_BUDGET = 5000.0        # ₹ per day for allocation
-TOP_N = 10
-HIST_DAYS = 180
-YF_PERIOD = "6mo"
+TOP_N = 10                   # Number of recommendations
+HIST_DAYS = 180              # historical window for indicators
+YF_PERIOD = "6mo"            # fallback period (live)
 REQUEST_TIMEOUT = 20
-SLEEP_BETWEEN = 0.12
+SLEEP_BETWEEN = 0.12         # polite delay between ticker downloads
 
-# Telegram secrets (set in GitHub/Actions secrets, not hardcoded!)
+# Telegram secrets (from GitHub Actions or env vars)
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
@@ -34,7 +34,8 @@ def download_nifty500_list():
     cleaned = [s for s in symbols if " " not in s and "DUMMY" not in s]
     return list(dict.fromkeys(cleaned))
 
-def sma(series, window): return series.rolling(window, min_periods=1).mean()
+def sma(series, window): 
+    return series.rolling(window, min_periods=1).mean()
 
 def rsi(series, window=14):
     delta = series.diff()
@@ -53,12 +54,14 @@ def macd(series, fast=12, slow=26, signal=9):
 def compute_score(df):
     if df is None or df.empty:
         return None
+
     if 'Adj Close' in df.columns:
         close = df['Adj Close'].dropna()
     elif 'Close' in df.columns:
         close = df['Close'].dropna()
     else:
         return None
+
     if close.empty or len(close) < 60:
         return None
 
@@ -70,15 +73,21 @@ def compute_score(df):
     last = float(close.iloc[-1])
     prev_idx = -2 if len(close) >= 2 else -1
 
-    score, reasons = 0.0, []
+    score = 0.0
+    reasons = []
 
+    # --- SMA relationship ---
     if float(s20.iloc[-1]) > float(s50.iloc[-1]):
-        score += 1.0; reasons.append("SMA20 > SMA50")
+        score += 1.0
+        reasons.append("SMA20 > SMA50")
     else:
         score -= 0.2
-    if float(s20.iloc[prev_idx]) <= float(s50.iloc[prev_idx]) and float(s20.iloc[-1]) > float(s50.iloc[-1]):
-        score += 1.0; reasons.append("Recent SMA cross up")
 
+    if float(s20.iloc[prev_idx]) <= float(s50.iloc[prev_idx]) and float(s20.iloc[-1]) > float(s50.iloc[-1]):
+        score += 1.0
+        reasons.append("Recent SMA cross up")
+
+    # --- RSI zones ---
     last_rsi = float(rsi14.iloc[-1]) if not rsi14.empty else 50.0
     if last_rsi < 30:
         score += 0.9; reasons.append(f"RSI {last_rsi:.1f} <30")
@@ -89,18 +98,20 @@ def compute_score(df):
     else:
         score -= 0.6; reasons.append(f"RSI {last_rsi:.1f} high")
 
-    if float(macd_hist.iloc[prev_idx]) <= 0 and float(macd_hist.iloc[-1]) > 0:
-        score += 0.9; reasons.append("MACD hist turned +")
-    if float(macd_hist.iloc[-1]) > 0:
-        score += 0.3
+    # --- MACD hist ---
+    if not macd_hist.empty:
+        if float(macd_hist.iloc[prev_idx]) <= 0 and float(macd_hist.iloc[-1]) > 0:
+            score += 0.9; reasons.append("MACD hist turned +")
+        if float(macd_hist.iloc[-1]) > 0:
+            score += 0.3
 
     return {
         "score": float(score),
         "last_close": last,
         "rsi": last_rsi,
-        "sma20": float(s20.iloc[-1]),
-        "sma50": float(s50.iloc[-1]),
-        "macd_hist": float(macd_hist.iloc[-1]),
+        "sma20": float(s20.iloc[-1]) if not s20.empty else np.nan,
+        "sma50": float(s50.iloc[-1]) if not s50.empty else np.nan,
+        "macd_hist": float(macd_hist.iloc[-1]) if not macd_hist.empty else np.nan,
         "reasons": "; ".join(reasons)
     }
 
@@ -119,22 +130,16 @@ def fetch_history(symbol, end_date=None):
 
 def send_telegram(msg):
     if not TELEGRAM_TOKEN or not TELEGRAM_CHAT_ID:
-        print("⚠️ Telegram skipped: missing token/chat_id")
+        print("⚠ Telegram not configured")
         return
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-    try:
-        r = requests.post(url, data={"chat_id": TELEGRAM_CHAT_ID, "text": msg, "parse_mode": "HTML"})
-        if r.status_code != 200:
-            print("⚠️ Telegram error:", r.text)
-    except Exception as e:
-        print("⚠️ Telegram exception:", e)
+    requests.post(url, data={"chat_id": TELEGRAM_CHAT_ID, "text": msg, "parse_mode": "HTML"})
 
-def df_to_pretty_table(df, cols=None, top_n=10, mode="LIVE"):
-    if cols is None:
-        cols = ["symbol", "buy_price", "target_price", "stop_loss"]
-    df = df[cols].head(top_n).round(2)
-    table = df.to_string(index=False)
-    return f"📊 Top {len(df)} Stock Recommendations ({mode})\n\n<pre>{table}</pre>"
+def send_telegram_table(df, top_n=10):
+    text = f"📊 Top {top_n} Stock Recommendations (LIVE):\n\n"
+    for i, row in df.head(top_n).iterrows():
+        text += f"{i+1}. {row['symbol']} | Buy ₹{row['buy_price']:.2f} | Target ₹{row['target_price']:.2f} | SL ₹{row['stop_loss']:.2f}\n"
+    send_telegram(text)
 
 # ---------------- Main ----------------
 def main():
@@ -146,17 +151,11 @@ def main():
     if mode_env:
         mode = "backdated" if mode_env.strip() == "2" else "live"
         backdate = backdate_env
-        if mode == "backdated" and not backdate:
-            print("⚠ BACKDATE must be set when MODE=2")
-            sys.exit(1)
-        print(f"🔧 Running in AUTO mode: {mode.upper()} {('('+backdate+')') if backdate else ''}")
     else:
-        mode_in = input("Select mode (1 = Live, 2 = Backdated): ").strip()
-        mode = "backdated" if mode_in == "2" else "live"
+        mode = "live"
         backdate = None
-        if mode == "backdated":
-            backdate = input("Enter backdate (YYYY-MM-DD): ").strip()
 
+    # --- Download stock list ---
     symbols = download_nifty500_list()
     results = []
     pbar = tqdm(total=len(symbols), desc="Scanning", unit="stk")
@@ -169,11 +168,14 @@ def main():
         pbar.update(1)
         time.sleep(SLEEP_BETWEEN)
     pbar.close()
+
     if not results:
-        print("⚠ No results"); return
+        print("⚠ No results")
+        return
 
     df_all = pd.DataFrame(results).sort_values("score", ascending=False).reset_index(drop=True)
 
+    # Top N selection + allocation
     top = df_all.head(TOP_N).copy()
     cash_per = DAILY_BUDGET / TOP_N
     top["qty"] = (cash_per / top["last_close"]).astype(int)
@@ -181,19 +183,22 @@ def main():
     top["target_price"] = (top["buy_price"] * 1.03).round(2)
     top["stop_loss"] = (top["buy_price"] * 0.98).round(2)
 
+    # Save outputs
     tag = datetime.now().strftime("%Y%m%d") if mode=="live" else f"backtest_{backdate}"
     fname = f"nifty_scan_{tag}.xlsx"
     with pd.ExcelWriter(fname, engine="openpyxl") as writer:
         df_all.to_excel(writer, sheet_name="all_scored", index=False)
         top.to_excel(writer, sheet_name=f"top_{TOP_N}", index=False)
-    print(f"\n✅ Report saved: {fname}")
 
+    top.to_csv("top_10_stocks.csv", index=False)
+    top.to_excel("top_10_stocks.xlsx", index=False)
+
+    print(f"\n✅ Report saved: {fname}")
     print("\nTop picks:")
     print(top[["symbol","score","last_close","qty","buy_price","target_price","stop_loss","reasons"]].to_string(index=False))
 
     # --- Telegram summary ---
-    msg = df_to_pretty_table(top, mode=mode.upper())
-    send_telegram(msg)
+    send_telegram_table(top, top_n=TOP_N)
 
 if __name__=="__main__":
     main()

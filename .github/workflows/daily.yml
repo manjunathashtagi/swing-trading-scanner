@@ -50,11 +50,15 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: scanner-results
-          path: "*.csv"
+          path: 
+            top_5_stocks.csv
+            top_5_stocks.xlsx
+            *.xlsx
+          if-no-files-found: error
 
       - name: Notify Telegram
         run: |
-          MESSAGE="📊 Top 5 Stock Recommendations:\n$(head -n 12 top_5_stocks.csv)"
+          MESSAGE="📊 Top 10 Stock Recommendations:\n$(head -n 12 top_10_stocks.csv)"
           curl -s -X POST https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage \
             -d chat_id=${TELEGRAM_CHAT_ID} \
             -d text="$MESSAGE"
