@@ -1,31 +1,49 @@
-name: Daily Swing Trade Analysis
+name: CSV Pipeline
 
 on:
-  schedule:
-    - cron: "30 10 * * 1-5"   # Runs every weekday at 10:30 UTC (4 PM IST)
-  workflow_dispatch:          # Allow manual runs
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch: # allow manual trigger
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repo
+      - name: Checkout repository
         uses: actions/checkout@v3
 
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.11'
+          python-version: "3.11"
 
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
 
-      - name: Run Swing Trade Scanner
-        run: python app.py
+      - name: Run script
+        run: |
+          python your_script.py
 
+      # Upload all CSV files as artifacts
       - name: Upload CSV results
         uses: actions/upload-artifact@v3
         with:
-          name: swing-trade-results
-          path: results/*.csv   # <-- change to your script’s CSV output folder
+          name: csv-results
+          path: |
+            *.csv
+            output/*.csv
+
+      # Telegram notification
+      - name: Send Telegram Notification
+        if: always() # run even if job fails
+        run: |
+          STATUS=${{ job.status }}
+          MESSAGE="GitHub Action for repo: ${{ github.repository }}\nBranch: ${{ github.ref_name }}\nStatus: $STATUS\nRun: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+            -d chat_id=${{ secrets.TELEGRAM_CHAT_ID }} \
+            -d text="$MESSAGE"
