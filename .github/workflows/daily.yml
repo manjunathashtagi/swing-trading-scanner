@@ -27,7 +27,10 @@ jobs:
 
       - name: Run script
         run: |
-          python your_script.py
+          app.py
+          
+      - name: List files for debugging
+        run: ls -R
 
       # Upload all CSV files as artifacts
       - name: Upload CSV results
