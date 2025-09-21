@@ -10,7 +10,11 @@ on:
       BACKDATE:
         description: "Enter date (YYYY-MM-DD) if MODE=2"
         required: false
-
+  schedule:
+    # Run daily at 9:15 AM IST (03:45 UTC)
+    - cron: "45 3 * * 1-5"
+    # Run daily at 6:30 PM IST (13:00 UTC)
+    - cron: "0 13 * * 1-5"
 jobs:
   run-scanner:
     runs-on: ubuntu-latest
@@ -34,12 +38,12 @@ jobs:
           pip install -r requirements.txt
 
       - name: Run scanner
-         run: python app.py
-         env:
-           MODE: ${{ github.event.inputs.mode }}
-           BACKDATE: ${{ github.event.inputs.backdate }}
-           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python app.py
+        env:
+          MODE: ${{ github.event.inputs.mode }}
+          BACKDATE: ${{ github.event.inputs.backdate }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
 
 
       - name: Upload CSV
@@ -50,7 +54,7 @@ jobs:
 
       - name: Notify Telegram
         run: |
-          MESSAGE="✅ Scan completed. Mode=${MODE}, Backdate=${BACKDATE}"
+          MESSAGE="📊 Top 5 Stock Recommendations:\n$(head -n 10 top_5_stocks.csv)"
           curl -s -X POST https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage \
             -d chat_id=${TELEGRAM_CHAT_ID} \
             -d text="$MESSAGE"
