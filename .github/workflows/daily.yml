@@ -11,10 +11,9 @@ on:
         description: "Enter date (YYYY-MM-DD) if MODE=2"
         required: false
   schedule:
-    # Run daily at 9:15 AM IST (03:45 UTC)
-    - cron: "45 3 * * 1-5"
-    # Run daily at 6:30 PM IST (13:00 UTC)
-    - cron: "0 13 * * 1-5"
+    - cron: "45 3 * * 1-5"   # 9:15 AM IST
+    - cron: "0 13 * * 1-5"   # 6:30 PM IST
+
 jobs:
   run-scanner:
     runs-on: ubuntu-latest
@@ -23,6 +22,7 @@ jobs:
       TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
       MODE: ${{ github.event.inputs.MODE }}
       BACKDATE: ${{ github.event.inputs.BACKDATE }}
+
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -36,23 +36,19 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+          pip install yfinance pandas numpy openpyxl tqdm requests
 
       - name: Run scanner
         run: python app.py
-        env:
-          MODE: ${{ github.event.inputs.mode }}
-          BACKDATE: ${{ github.event.inputs.backdate }}
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
 
+      - name: Debug list files
+        run: ls -lah
 
       - name: Upload CSV
         uses: actions/upload-artifact@v4
         with:
           name: scanner-results
-          path: 
-            top_10_stocks.csv
-            top_10_stocks.xlsx
+          path: top_10_stocks.csv
           if-no-files-found: error
 
       - name: Notify Telegram

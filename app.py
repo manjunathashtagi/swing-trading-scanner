@@ -190,14 +190,16 @@ def main():
         df_all.to_excel(writer, sheet_name="all_scored", index=False)
         top.to_excel(writer, sheet_name=f"top_{TOP_N}", index=False)
 
+        # Save outputs (CSV only)
     top.to_csv("top_10_stocks.csv", index=False)
 
-    print(f"\n✅ Report saved: {fname}")
+    print(f"\n✅ Report saved: top_10_stocks.csv")
     print("\nTop picks:")
     print(top[["symbol","score","last_close","qty","buy_price","target_price","stop_loss","reasons"]].to_string(index=False))
 
     # --- Telegram summary ---
     send_telegram_table(top, top_n=TOP_N)
+
 
 if __name__=="__main__":
     main()
