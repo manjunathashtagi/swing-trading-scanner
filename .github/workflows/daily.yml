@@ -1,55 +1,67 @@
-name: CSV Pipeline
+name: Swing Trading Scanner
 
 on:
-  push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
-  workflow_dispatch: # allow manual trigger
+  schedule:
+    - cron: '30 13 * * *'   # 13:30 UTC = 19:00 IST (adjust if needed)
+  workflow_dispatch:        # allow manual trigger
 
 jobs:
-  build:
+  run-scanner:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
+      - name: Checkout repo
+        uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install --upgrade pip
+          pip install yfinance pandas requests tqdm
 
-      - name: Run Swing Trade Scanner
-        run: |
-          python app.py
+      - name: Run Swing Scanner
         env:
-            MODE: "1"   # 1 = Live, 2 = Backdated
-            
-      # Debug step: show all generated files
-      - name: List files for debugging
-        run: ls -R
+          MODE: "1"   # 1 = Live, 2 = Backdated
+          # ANALYSIS_DATE: "2024-09-01"   # only required if MODE=2
+        run: python app.py
 
-      # Upload CSV results
-      - name: Upload CSV results
+      - name: Upload results
         uses: actions/upload-artifact@v4
         with:
-          name: csv-results
-          path: "**/*.csv"
-          
+          name: swing-scanner-results
+          path: |
+            swing_scanner_results.csv
+            top5.csv
 
-
-      # Telegram notification
-      - name: Send Telegram Notification
+      - name: Send Telegram Message
         if: always()
         run: |
-          STATUS=${{ job.status }}
-          MESSAGE="📊 Swing Trading Scanner Run\n\nRepo: ${{ github.repository }}\nBranch: ${{ github.ref_name }}\nStatus: $STATUS\nRun: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
-            -d chat_id=${{ secrets.TELEGRAM_CHAT_ID }} \
-            -d text="$MESSAGE"
+          python - <<'EOF'
+          import os
+          import requests
+          import pandas as pd
+
+          bot_token = os.environ["8394166743:AAEASt_4WYwlNB6LP3j6_4VM-qPkPTt4Erg"]
+          chat_id = os.environ["1384256039"]
+
+          if not os.path.exists("top5.csv"):
+              msg = "⚠️ No results generated today."
+              requests.post(f"https://api.telegram.org/bot{bot_token}/sendMessage",
+                            data={"chat_id": chat_id, "text": msg})
+              exit(0)
+
+          df = pd.read_csv("top5.csv")
+          text = "📊 *Top 5 Swing Trading Picks Today* 📊\n\n"
+          for i, row in df.iterrows():
+              text += f"{i+1}. {row['Ticker']} — Change: {row['Change %']}%\n"
+
+          requests.post(f"https://api.telegram.org/bot{bot_token}/sendMessage",
+                        data={"chat_id": chat_id, "text": text, "parse_mode": "Markdown"})
+          EOF
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
