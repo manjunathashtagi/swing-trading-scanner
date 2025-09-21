@@ -46,3 +46,11 @@ if st.button("Run Scanner"):
         st.dataframe(pd.DataFrame(results))
     else:
         st.warning("⚠️ No results generated.")
+def send_to_telegram(csv_file, bot_token, chat_id):
+    df = pd.read_csv(csv_file)
+    top5 = df.head(5).to_string(index=False)
+
+    message = f"📊 Daily Swing Trade Top 5 Picks:\n\n{top5}"
+    url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+    payload = {"@Manjunath1113": chat_id, "text": message}
+    requests.post(url, data=payload)
