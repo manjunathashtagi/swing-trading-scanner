@@ -203,6 +203,9 @@ def main():
     with pd.ExcelWriter(fname, engine="openpyxl") as writer:
         df_all.to_excel(writer, sheet_name="all_scored", index=False)
         top.to_excel(writer, sheet_name=f"top_{TOP_N}", index=False)
+    # --- Save separate Top 5 outputs ---
+    top.to_csv("top_5_stocks.csv", index=False)
+    top.to_excel("top_5_stocks.xlsx", index=False)
     
     print(f"\n✅ Report saved: {fname}")
     print("\nTop picks:")
