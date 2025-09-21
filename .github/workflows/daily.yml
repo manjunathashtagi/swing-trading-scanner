@@ -53,7 +53,6 @@ jobs:
           path: 
             top_10_stocks.csv
             top_10_stocks.xlsx
-            *.xlsx
           if-no-files-found: error
 
       - name: Notify Telegram
