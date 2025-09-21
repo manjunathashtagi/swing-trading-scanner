@@ -25,28 +25,27 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Run script
+      - name: Run Swing Trade Scanner
         run: |
-          app.py
-          
+          python app.py
+
+      # Debug step: show all generated files
       - name: List files for debugging
         run: ls -R
 
-      # Upload all CSV files as artifacts
+      # Upload CSV results
       - name: Upload CSV results
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: csv-results
-          path: |
-            *.csv
-            output/*.csv
+          path: "**/*.csv"
 
       # Telegram notification
       - name: Send Telegram Notification
-        if: always() # run even if job fails
+        if: always()
         run: |
           STATUS=${{ job.status }}
-          MESSAGE="GitHub Action for repo: ${{ github.repository }}\nBranch: ${{ github.ref_name }}\nStatus: $STATUS\nRun: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          MESSAGE="📊 Swing Trading Scanner Run\n\nRepo: ${{ github.repository }}\nBranch: ${{ github.ref_name }}\nStatus: $STATUS\nRun: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
             -d chat_id=${{ secrets.TELEGRAM_CHAT_ID }} \
             -d text="$MESSAGE"
