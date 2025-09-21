@@ -4,22 +4,27 @@ on:
   workflow_dispatch:
     inputs:
       MODE:
-        description: "Select Mode: 1 = Live, 2 = Backdated"
+        description: "Select mode: 1 = Live, 2 = Backdated"
         required: true
         default: "1"
       BACKDATE:
-        description: "Backdate (YYYY-MM-DD, required if MODE=2)"
+        description: "Enter date (YYYY-MM-DD) if MODE=2"
         required: false
 
 jobs:
   run-scanner:
     runs-on: ubuntu-latest
+    env:
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      MODE: ${{ github.event.inputs.MODE }}
+      BACKDATE: ${{ github.event.inputs.BACKDATE }}
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
@@ -28,25 +33,23 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Validate inputs
+      - name: Run scanner
         run: |
-          if [[ "${{ github.event.inputs.MODE }}" == "2" && -z "${{ github.event.inputs.BACKDATE }}" ]]; then
-            echo "❌ ERROR: BACKDATE is required when MODE=2 (backdated run)."
+          if [ "${MODE}" = "2" ] && [ -z "${BACKDATE}" ]; then
+            echo "❌ ERROR: BACKDATE must be set when MODE=2"
             exit 1
           fi
-
-      - name: Run scanner
-        env:
-          MODE: ${{ github.event.inputs.MODE }}
-          BACKDATE: ${{ github.event.inputs.BACKDATE }}
-          TELEGRAM_BOT_TOKEN: ${{ 8394166743:AAEASt_4WYwlNB6LP3j6_4VM-qPkPTt4Erg }}
-          TELEGRAM_CHAT_ID: ${{ 1384256039 }}
-        run: |
           python app.py
 
-      - name: Upload scan results
+      - name: Upload CSV
         uses: actions/upload-artifact@v4
         with:
-          name: scan-results
-          path: nifty_scan_*.csv
+          name: scanner-results
+          path: "*.csv"
 
+      - name: Notify Telegram
+        run: |
+          MESSAGE="✅ Scan completed. Mode=${MODE}, Backdate=${BACKDATE}"
+          curl -s -X POST https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage \
+            -d chat_id=${TELEGRAM_CHAT_ID} \
+            -d text="$MESSAGE"
