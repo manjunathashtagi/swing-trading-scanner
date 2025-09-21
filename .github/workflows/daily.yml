@@ -2,26 +2,30 @@ name: Daily Swing Trade Analysis
 
 on:
   schedule:
-    - cron: "0 13 * * 1-5"   # Runs Mon-Fri at 13:00 UTC = 6:30 PM IST
-  workflow_dispatch:         # Allow manual run from GitHub Actions
+    - cron: "30 10 * * 1-5"   # Runs every weekday at 10:30 UTC (4 PM IST)
+  workflow_dispatch:          # Allow manual runs
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout repo
-      uses: actions/checkout@v3
+      - name: Checkout repo
+        uses: actions/checkout@v3
 
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: "3.11"
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
 
-    - name: Install dependencies
-      run: |
-        pip install -r requirements.txt
+      - name: Install dependencies
+        run: pip install -r requirements.txt
 
-    - name: Run Swing Trade Scanner
-      run: |
-        python app.py
+      - name: Run Swing Trade Scanner
+        run: python app.py
+
+      - name: Upload CSV results
+        uses: actions/upload-artifact@v3
+        with:
+          name: swing-trade-results
+          path: results/*.csv   # <-- change to your script’s CSV output folder
