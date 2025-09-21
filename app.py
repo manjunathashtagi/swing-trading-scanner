@@ -14,7 +14,7 @@ OUTPUT_FILE = "swing_trading_results.csv"''
 # --------- Configuration ----------
 
 DAILY_BUDGET = 5000.0        # ₹ per day for allocation
-TOP_N = 5
+TOP_N = 10
 HIST_DAYS = 180              # historical window for indicators
 YF_PERIOD = "6mo"            # fallback period (live)
 REQUEST_TIMEOUT = 20
@@ -212,9 +212,10 @@ def main():
     print(top[["symbol","score","last_close","qty","buy_price","target_price","stop_loss","reasons"]].to_string(index=False))
     
     # --- Telegram summary ---
-    msg = f"📊 Top {TOP_N} picks ({mode.upper()}{' ' + backdate if mode=='backdated' else ''}):\n\n"
-    for r in top.itertuples():
-        msg += f"{r.symbol} | Buy ₹{r.buy_price:.2f} | Target ₹{r.target_price:.2f} | SL ₹{r.stop_loss:.2f}\n"
+    msg = f"📊 Top {TOP_N} Stock Recommendations ({mode.upper()}{' ' + backdate if mode=='backdated' else ''}):\n\n"
+    for i, r in enumerate(top.itertuples(), 1):
+        msg += f"{i}. {r.symbol} | Buy ₹{r.buy_price:.2f} | Target ₹{r.target_price:.2f} | SL ₹{r.stop_loss:.2f}\n"
+
     
     send_telegram(msg)
 
