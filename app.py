@@ -191,7 +191,6 @@ def main():
         top.to_excel(writer, sheet_name=f"top_{TOP_N}", index=False)
 
     top.to_csv("top_10_stocks.csv", index=False)
-    top.to_excel("top_10_stocks.xlsx", index=False)
 
     print(f"\n✅ Report saved: {fname}")
     print("\nTop picks:")
