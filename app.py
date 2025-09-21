@@ -211,13 +211,23 @@ def main():
     print("\nTop picks:")
     print(top[["symbol","score","last_close","qty","buy_price","target_price","stop_loss","reasons"]].to_string(index=False))
     
-    # --- Telegram summary ---
-    msg = f"📊 Top {TOP_N} Stock Recommendations ({mode.upper()}{' ' + backdate if mode=='backdated' else ''}):\n\n"
-    for i, r in enumerate(top.itertuples(), 1):
-        msg += f"{i}. {r.symbol} | Buy ₹{r.buy_price:.2f} | Target ₹{r.target_price:.2f} | SL ₹{r.stop_loss:.2f}\n"
+def df_to_pretty_table(df, cols=None, top_n=10):
+    if cols is None:
+        cols = ["symbol", "buy_price", "target_price", "stop_loss"]
 
-    
-    send_telegram(msg)
+    # Keep only needed cols
+    df = df[cols].head(top_n)
+
+    # Format numbers nicely
+    df = df.round(2)
+
+    # Convert to aligned string table
+    table = df.to_string(index=False)
+    return f"📊 Top {len(df)} Stock Recommendations\n\n<pre>{table}</pre>"
+
+    # --- Telegram summary ---
+    msg = df_to_pretty_table(top_picks_df)
+    bot.send_message(chat_id=CHAT_ID, text=msg, parse_mode="HTML")
 
 if __name__=="__main__":
     main()
