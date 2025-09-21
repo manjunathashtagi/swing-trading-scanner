@@ -1,0 +1,27 @@
+name: Daily Swing Trade Analysis
+
+on:
+  schedule:
+    - cron: "0 13 * * 1-5"   # Runs Mon-Fri at 13:00 UTC = 6:30 PM IST
+  workflow_dispatch:         # Allow manual run from GitHub Actions
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repo
+      uses: actions/checkout@v3
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.11"
+
+    - name: Install dependencies
+      run: |
+        pip install -r requirements.txt
+
+    - name: Run Swing Trade Scanner
+      run: |
+        python app.py
