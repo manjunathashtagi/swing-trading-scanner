@@ -51,8 +51,8 @@ jobs:
         with:
           name: scanner-results
           path: 
-            top_5_stocks.csv
-            top_5_stocks.xlsx
+            top_10_stocks.csv
+            top_10_stocks.xlsx
             *.xlsx
           if-no-files-found: error
 
