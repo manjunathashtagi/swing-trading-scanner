@@ -1,67 +1,52 @@
 name: Swing Trading Scanner
 
 on:
-  schedule:
-    - cron: '30 13 * * *'   # 13:30 UTC = 19:00 IST (adjust if needed)
-  workflow_dispatch:        # allow manual trigger
+  workflow_dispatch:
+    inputs:
+      MODE:
+        description: "Select Mode: 1 = Live, 2 = Backdated"
+        required: true
+        default: "1"
+      BACKDATE:
+        description: "Backdate (YYYY-MM-DD, required if MODE=2)"
+        required: false
 
 jobs:
   run-scanner:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v4
         with:
-          python-version: "3.11"
+          python-version: '3.11'
 
       - name: Install dependencies
         run: |
-          pip install --upgrade pip
-          pip install yfinance pandas requests tqdm
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
 
-      - name: Run Swing Scanner
+      - name: Validate inputs
+        run: |
+          if [[ "${{ github.event.inputs.MODE }}" == "2" && -z "${{ github.event.inputs.BACKDATE }}" ]]; then
+            echo "❌ ERROR: BACKDATE is required when MODE=2 (backdated run)."
+            exit 1
+          fi
+
+      - name: Run scanner
         env:
-          MODE: "1"   # 1 = Live, 2 = Backdated
-          # ANALYSIS_DATE: "2024-09-01"   # only required if MODE=2
-        run: python app.py
+          MODE: ${{ github.event.inputs.MODE }}
+          BACKDATE: ${{ github.event.inputs.BACKDATE }}
+          TELEGRAM_BOT_TOKEN: ${{ 8394166743:AAEASt_4WYwlNB6LP3j6_4VM-qPkPTt4Erg }}
+          TELEGRAM_CHAT_ID: ${{ 1384256039 }}
+        run: |
+          python app.py
 
-      - name: Upload results
+      - name: Upload scan results
         uses: actions/upload-artifact@v4
         with:
-          name: swing-scanner-results
-          path: |
-            swing_scanner_results.csv
-            top5.csv
+          name: scan-results
+          path: nifty_scan_*.csv
 
-      - name: Send Telegram Message
-        if: always()
-        run: |
-          python - <<'EOF'
-          import os
-          import requests
-          import pandas as pd
-
-          bot_token = os.environ["8394166743:AAEASt_4WYwlNB6LP3j6_4VM-qPkPTt4Erg"]
-          chat_id = os.environ["1384256039"]
-
-          if not os.path.exists("top5.csv"):
-              msg = "⚠️ No results generated today."
-              requests.post(f"https://api.telegram.org/bot{bot_token}/sendMessage",
-                            data={"chat_id": chat_id, "text": msg})
-              exit(0)
-
-          df = pd.read_csv("top5.csv")
-          text = "📊 *Top 5 Swing Trading Picks Today* 📊\n\n"
-          for i, row in df.iterrows():
-              text += f"{i+1}. {row['Ticker']} — Change: {row['Change %']}%\n"
-
-          requests.post(f"https://api.telegram.org/bot{bot_token}/sendMessage",
-                        data={"chat_id": chat_id, "text": text, "parse_mode": "Markdown"})
-          EOF
-        env:
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
