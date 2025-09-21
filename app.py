@@ -184,25 +184,35 @@ def main():
         pbar.update(1)
         time.sleep(SLEEP_BETWEEN)
     pbar.close()
-
     if not results:
         print("⚠ No results"); return
 
-    df_all = pd.DataFrame(results).sort_values("score", ascending=False)
+    df_all = pd.DataFrame(results).sort_values("score", ascending=False).reset_index(drop=True)
+
+    # Top N selection + allocation
     top = df_all.head(TOP_N).copy()
-    df_all["is_top"] = df_all.symbol.isin(top.symbol)
+    cash_per = DAILY_BUDGET / TOP_N
+    top["qty"] = (cash_per / top["last_close"]).astype(int)
+    top["buy_price"] = top["last_close"]
+    top["target_price"] = (top["buy_price"] * 1.03).round(2)
+    top["stop_loss"] = (top["buy_price"] * 0.98).round(2)
     
+    # Save to one CSV with 2 sheets
     tag = datetime.now().strftime("%Y%m%d") if mode=="live" else f"backtest_{backdate}"
-    csv_name = f"nifty_scan_{tag}.csv"
-    df_all.to_csv(csv_name, index=False)
+    fname = f"nifty_scan_{tag}.xlsx"
+    with pd.ExcelWriter(fname, engine="openpyxl") as writer:
+        df_all.to_excel(writer, sheet_name="all_scored", index=False)
+        top.to_excel(writer, sheet_name=f"top_{TOP_N}", index=False)
     
-    print(f"✅ Results saved: {csv_name}")
-    print(top[["symbol","score","last_close","reasons"]])
+    print(f"\n✅ Report saved: {fname}")
+    print("\nTop picks:")
+    print(top[["symbol","score","last_close","qty","buy_price","target_price","stop_loss","reasons"]].to_string(index=False))
     
-    # Telegram summary
-    msg = f"Top {TOP_N} picks ({mode.upper()}):\n" + "\n".join(
-        f"{r.symbol} | {r.last_close:.2f} | {r.score:.2f}" for r in top.itertuples()
-    )
+    # --- Telegram summary ---
+    msg = f"📊 Top {TOP_N} picks ({mode.upper()}{' ' + backdate if mode=='backdated' else ''}):\n\n"
+    for r in top.itertuples():
+        msg += f"{r.symbol} | Buy ₹{r.buy_price:.2f} | Target ₹{r.target_price:.2f} | SL ₹{r.stop_loss:.2f}\n"
+    
     send_telegram(msg)
 
 if __name__=="__main__":

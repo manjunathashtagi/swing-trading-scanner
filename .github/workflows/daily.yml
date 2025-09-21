@@ -34,12 +34,13 @@ jobs:
           pip install -r requirements.txt
 
       - name: Run scanner
-        run: |
-          if [ "${MODE}" = "2" ] && [ -z "${BACKDATE}" ]; then
-            echo "❌ ERROR: BACKDATE must be set when MODE=2"
-            exit 1
-          fi
-          python app.py
+         run: python app.py
+         env:
+           MODE: ${{ github.event.inputs.mode }}
+           BACKDATE: ${{ github.event.inputs.backdate }}
+           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+
 
       - name: Upload CSV
         uses: actions/upload-artifact@v4
