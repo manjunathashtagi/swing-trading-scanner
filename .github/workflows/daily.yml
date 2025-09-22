@@ -1,32 +1,85 @@
-name: Daily Stock Scanner
+
+Skip to content
+Navigation Menu
+manjunathashtagi
+swing-trading-scanner
+
+Code
+Issues
+Pull requests
+Actions
+Projects
+Wiki
+Security 1
+Insights
+
+    Settings
+
+Swing Trading Scanner
+Daily Stock Scanner #22
+
+Jobs
+
+Run details
+
+Workflow file for this run
+.github/workflows/daily.yml at 3ca0987
+name: Swing Trading Scanner
 
 on:
+  workflow_dispatch:
+    inputs:
+      MODE:
+        description: "Select mode: 1 = Live, 2 = Backdated"
+        required: true
+        default: "1"
+      BACKDATE:
+        description: "Enter date (YYYY-MM-DD) if MODE=2"
+        required: false
   schedule:
-    - cron: "0 4 * * *"   # 9:30 AM IST (04:00 UTC)
-    - cron: "0 10 * * *"  # 3:30 PM IST (10:00 UTC)
-  workflow_dispatch:      # allows manual run from Actions tab
+    - cron: "45 3 * * 1-5"   # 9:15 AM IST
+    - cron: "0 13 * * 1-5"   # 6:30 PM IST
 
 jobs:
   run-scanner:
     runs-on: ubuntu-latest
+    env:
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      MODE: ${{ github.event.inputs.MODE }}
+      BACKDATE: ${{ github.event.inputs.BACKDATE }}
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repo
+        uses: actions/checkout@v4
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: '3.11'
 
       - name: Install dependencies
-        run: pip install -r requirements.txt
-
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install yfinance pandas numpy openpyxl tqdm requests
       - name: Run scanner
         run: python app.py
 
-      - name: Commit results
+      - name: Debug list files
+        run: ls -lah
+
+      - name: Upload CSV
+        uses: actions/upload-artifact@v4
+        with:
+          name: scanner-results
+          path: top_10_stocks.csv
+          if-no-files-found: error
+
+      - name: Notify Telegram
         run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git add top_10_stocks.csv
-          git commit -m "Update results [skip ci]" || echo "No changes to commit"
-          git push
+          MESSAGE="📊 Top 10 Stock Recommendations:\n$(head -n 12 top_10_stocks.csv)"
+          curl -s -X POST https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage \
+            -d chat_id=${TELEGRAM_CHAT_ID} \
+            -d text="$MESSAGE"
+Initial commit with app and workflow · manjunathashtagi/swing-trading-scanner@3ca0987
