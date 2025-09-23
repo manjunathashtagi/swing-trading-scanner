@@ -1,24 +1,42 @@
-name: Daily Stock Scanner
+name: Swing Trading Scanner
 
 on:
+  workflow_dispatch:
+    inputs:
+      MODE:
+        description: "Select mode: 1 = Live, 2 = Backdated"
+        required: true
+        default: "1"
+      BACKDATE:
+        description: "Enter date (YYYY-MM-DD) if MODE=2"
+        required: false
   schedule:
-    - cron: "0 4 * * *"   # 9:30 AM IST (04:00 UTC)
-    - cron: "0 10 * * *"  # 3:30 PM IST (10:00 UTC)
-  workflow_dispatch:      # allows manual run from Actions tab
+    - cron: "45 3 * * 1-5"   # 9:15 AM IST
+    - cron: "0 13 * * 1-5"   # 6:30 PM IST
+
+permissions:
+  contents: write   # ✅ allow push to repo
 
 jobs:
   run-scanner:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}  # ✅ use repo token
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: '3.11'
 
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install yfinance pandas numpy openpyxl tqdm requests
 
       - name: Run scanner
         run: python app.py
@@ -30,3 +48,5 @@ jobs:
           git add top_10_stocks.csv
           git commit -m "Update results [skip ci]" || echo "No changes to commit"
           git push
+      - name: Notify Telegram run:
+      | MESSAGE="📊 Top 10 Stock Recommendations:\n$(head -n 12 top_10_stocks.csv)" curl -s -X POST https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage \ -d chat_id=${TELEGRAM_CHAT_ID} \ -d text="$MESSAGE" Initial commit with app and workflow · manjunathashtagi/swing-trading-scanner@3ca0987
