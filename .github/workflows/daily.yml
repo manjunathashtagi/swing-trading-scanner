@@ -14,18 +14,16 @@ on:
     - cron: "45 3 * * 1-5"   # 9:15 AM IST
     - cron: "0 13 * * 1-5"   # 6:30 PM IST
 
-permissions:
-  contents: write   # ✅ allow push to repo
-
 jobs:
   run-scanner:
     runs-on: ubuntu-latest
+    env:
+      MODE: ${{ github.event.inputs.MODE }}
+      BACKDATE: ${{ github.event.inputs.BACKDATE }}
 
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}  # ✅ use repo token
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -41,12 +39,31 @@ jobs:
       - name: Run scanner
         run: python app.py
 
+      - name: Debug list files
+        run: ls -lah
+
       - name: Commit results
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git add top_10_stocks.csv
           git commit -m "Update results [skip ci]" || echo "No changes to commit"
-          git push
-      - name: Notify Telegram run:
-      | MESSAGE="📊 Top 10 Stock Recommendations:\n$(head -n 12 top_10_stocks.csv)" curl -s -X POST https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage \ -d chat_id=${TELEGRAM_CHAT_ID} \ -d text="$MESSAGE" Initial commit with app and workflow · manjunathashtagi/swing-trading-scanner@3ca0987
+          git push https://x-access-token:${{ secrets.GH_TOKEN }}@github.com/${{ github.repository }}.git HEAD:main
+
+      - name: Upload CSV artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: scanner-results
+          path: top_10_stocks.csv
+          if-no-files-found: error
+
+      - name: Send Telegram Notification
+        if: always()
+        run: |
+          STATUS="✅ Daily Scanner run completed"
+          if [ "${{ job.status }}" != "success" ]; then
+            STATUS="❌ Daily Scanner failed"
+          fi
+          curl -s -X POST https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/sendMessage \
+            -d chat_id=${{ secrets.TELEGRAM_CHAT_ID }} \
+            -d text="$STATUS"
