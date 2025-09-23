@@ -18,6 +18,11 @@ jobs:
   run-scanner:
     runs-on: ubuntu-latest
     env:
+<<<<<<< HEAD
+=======
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+>>>>>>> 3b311caf2c7a1ef5e226856de91f55a9f47cf4d2
       MODE: ${{ github.event.inputs.MODE }}
       BACKDATE: ${{ github.event.inputs.BACKDATE }}
 
@@ -35,13 +40,17 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install yfinance pandas numpy openpyxl tqdm requests
+<<<<<<< HEAD
 
+=======
+>>>>>>> 3b311caf2c7a1ef5e226856de91f55a9f47cf4d2
       - name: Run scanner
         run: python app.py
 
       - name: Debug list files
         run: ls -lah
 
+<<<<<<< HEAD
       - name: Commit results
         run: |
           git config --global user.name "github-actions[bot]"
@@ -67,3 +76,19 @@ jobs:
           curl -s -X POST https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/sendMessage \
             -d chat_id=${{ secrets.TELEGRAM_CHAT_ID }} \
             -d text="$STATUS"
+=======
+      - name: Upload CSV
+        uses: actions/upload-artifact@v4
+        with:
+          name: scanner-results
+          path: top_10_stocks.csv
+          if-no-files-found: error
+
+      - name: Notify Telegram
+        run: |
+          MESSAGE="📊 Top 10 Stock Recommendations:\n$(head -n 12 top_10_stocks.csv)"
+          curl -s -X POST https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage \
+            -d chat_id=${TELEGRAM_CHAT_ID} \
+            -d text="$MESSAGE"
+Initial commit with app and workflow · manjunathashtagi/swing-trading-scanner@3ca0987
+>>>>>>> 3b311caf2c7a1ef5e226856de91f55a9f47cf4d2
